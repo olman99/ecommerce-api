@@ -1,0 +1,370 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username         String       @db.VarChar(100)
+  password         String       @db.VarChar(100)
+  email            String       @unique
+  emailVerifiedAt  DateTime?    @map("email_verified_at")
+  lastLogin        DateTime?    @map("last_login")
+  emailVerifyToken DateTime?    @map("email_verified_token")
+  rememberToken    String?      @map("remember_token")
+  imageUrl         String?      @map("image_url")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz()
+  Customer         Customer?
+  orders           SalesOrder[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String
+  imageUrl    String            @map("image_url")
+  position    Int
+  parentId    String?           @map("parent_id") @db.Uuid
+  parent      Category?         @relation("category_parent", fields: [parentId], references: [id])
+  categories  Category[]        @relation("category_parent")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz()
+  products    ProductCategory[]
+
+  @@map("categories")
+}
+
+enum ProductType {
+  SIMPLE
+  BUNDLE
+}
+
+model Product {
+  id               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type             ProductType
+  name             String
+  sku              String                      @unique
+  externalCode     String?                     @unique @map("external_code")
+  description      String
+  hasComments      Boolean                     @map("has_comments")
+  imageUrl         String?                     @map("image_url")
+  price            Decimal
+  specialPrice     Decimal?                    @map("special_price")
+  specialPriceFrom DateTime?                   @map("special_price_from")
+  specialPriceAt   DateTime?                   @map("special_price_at")
+  active           Boolean
+  createdAt        DateTime                    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime                    @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt        DateTime?                   @map("deleted_at") @db.Timestamptz()
+  categories       ProductCategory[]
+  optionGroups     ProductBundleOptionGroups[]
+  coupons          ProducCoupon[]
+
+  @@map("products")
+}
+
+model ProductCategory {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId  String   @map("product_id")
+  product    Product  @relation(fields: [productId], references: [id])
+  categoryId String   @map("category_id")
+  category   Category @relation(fields: [categoryId], references: [id])
+  position   Int
+
+  @@map("product_categories")
+}
+
+model ProductBundleOptionGroups {
+  id        String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String                 @map("product_id")
+  product   Product                @relation(fields: [productId], references: [id])
+  name      String
+  position  Int
+  required  Boolean                @default(false)
+  type      String
+  qtyMin    Int                    @map("qty_min")
+  qtyMax    Int                    @map("qty_max")
+  options   ProductBundleOptions[]
+  createdAt DateTime               @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime               @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime?              @map("deleted_at") @db.Timestamptz()
+
+  @@map("product_bundle_option_groups")
+}
+
+model ProductBundleOptions {
+  id            String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  position      Int
+  name          String
+  isDefault     Boolean                   @default(false) @map("is_default")
+  modifyPrice   Boolean                   @default(false) @map("modify_price")
+  bundleGroupId String                    @map("product_bundle_option_group_id")
+  group         ProductBundleOptionGroups @relation(fields: [bundleGroupId], references: [id])
+  createdAt     DateTime                  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime                  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt     DateTime?                 @map("deleted_at") @db.Timestamptz()
+
+  @@map("product_bundle_options")
+}
+
+model ShippingMethod {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  code         String
+  externalCode String    @map("external_code")
+  active       Boolean   @default(true)
+  isShipping   Boolean   @default(true) @map("is_shipping")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz()
+
+  @@map("shipping_methods")
+}
+
+model PaymentMethod {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  code         String
+  externalCode String    @map("external_code")
+  active       Boolean   @default(true)
+  showInPanel  Boolean   @default(true) @map("show_in_panel")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz()
+
+  @@map("payment_methods")
+}
+
+model Customer {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String?           @unique @map("user_id")
+  user           User?             @relation(fields: [userId], references: [id])
+  email          String            @unique
+  active         Boolean           @default(true)
+  externalCode   String?           @map("external_code")
+  name           String
+  lastName       String            @map("last_name")
+  documentType   String            @map("document_type")
+  documentNumber String            @map("document_number")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt      DateTime?         @map("deleted_at") @db.Timestamptz()
+  phones         CustomerPhone[]
+  adresses       CustomerAddress[]
+  orders         SalesOrder[]
+
+  @@map("customers")
+}
+
+model CustomerPhone {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  number            String
+  isMain            Boolean   @default(false) @map("is_main")
+  brand             String
+  countryCode       String    @map("country_code")
+  countryCodeNumber String    @map("country_code_number")
+  hasWhatsapp       Boolean   @map("has_whatsapp")
+  hasTelegram       Boolean   @map("has_telegram")
+  customerId        String    @map("customer_id")
+  customer          Customer  @relation(fields: [customerId], references: [id])
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz()
+
+  @@map("customer_phones")
+}
+
+model CustomerAddress {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  number      Int
+  name        String
+  place       String
+  reference   String?
+  coordinates String?
+  isFavorite  Boolean   @default(false) @map("is_favorite")
+  customerId  String    @map("customer_id")
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz()
+
+  @@map("customer_addresses")
+}
+
+model Coupon {
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type      String
+  value     Decimal
+  active    Boolean        @default(true)
+  status    String
+  dateFrom  DateTime       @map("date_from")
+  dateAt    DateTime       @map("date_at")
+  code      String         @unique
+  concept   String
+  products  ProducCoupon[]
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime?      @map("deleted_at") @db.Timestamptz()
+
+  @@map("coupons")
+}
+
+model ProducCoupon {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  couponId  String  @map("coupon_id")
+  coupon    Coupon  @relation(fields: [couponId], references: [id])
+
+  @@map("product_coupons")
+}
+
+enum OrderStatus {
+  CREATED
+  SENT
+  DISPLAYED
+  PENDING
+  PROCESSING
+  PROCESSED
+  CANCELED
+  REJECTED
+  DISPATCHED
+}
+
+model SalesOrder {
+  id                     String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId             String             @map("customer_id")
+  customer               Customer           @relation(fields: [customerId], references: [id])
+  userId                 String?            @map("user_id")
+  user                   User?              @relation(fields: [userId], references: [id])
+  preOrder               Boolean            @default(false) @map("pre_order")
+  deliveryDate           DateTime           @map("delivery_date")
+  deliveryDateMin        DateTime           @map("delivery_date_min")
+  deliveryDateMax        DateTime           @map("delivery_date_max")
+  shippingMethod         String             @map("shipping_method")
+  paymentMethod          String             @map("payment_method")
+  discountAmount         Decimal            @map("discount_amount")
+  shippingAmount         Decimal            @map("shipping_amount")
+  shippingDiscountAmount Decimal            @map("shipping_discount_amount")
+  subtotal               Decimal
+  total                  Decimal
+  totalPaid              Decimal?           @map("total_paid")
+  customerIsGuest        Boolean            @map("customer_is_guest")
+  emailSent              Boolean            @map("email_sent")
+  customerEmail          String             @map("customer_email")
+  customerFirstname      String             @map("customer_firstname")
+  customerLastname       String             @map("customer_lastname")
+  customerDocumentType   String             @map("customer_document_type")
+  customerDocumentNumber String             @map("customer_document_number")
+  customerPhone          String             @map("customer_phone")
+  withInvoice            Boolean            @default(false) @map("with_invoice")
+  comment                String
+  origin                 String
+  channel                String
+  externalOrderCode      String?            @map("external_order_code")
+  cancelationMessage     String             @map("cancelation_message")
+  status                 OrderStatus
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt              DateTime?          @map("deleted_at") @db.Timestamptz()
+  SaleOrderHistory       SaleOrderHistory[]
+  SaleOrderAddresses     SaleOrderAddress[]
+
+  SaleOrderCoupon SaleOrderCoupon[]
+  SaleOrderItem   SaleOrderItem[]
+  @@map("sales_order")
+}
+
+model SaleOrderHistory {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  saleOrderId    String      @map("sale_order_id")
+  saleOrder      SalesOrder  @relation(fields: [saleOrderId], references: [id])
+  status         OrderStatus
+  comment        String
+  previousStatus OrderStatus @map("previous_status")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz()
+
+  @@map("sale_order_history")
+}
+
+model SaleOrderAddress {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  saleOrderId String     @map("sale_order_id")
+  saleOrder   SalesOrder @relation(fields: [saleOrderId], references: [id])
+  name        String
+  number      Int
+  reference   String
+  place       String
+  coordinates String
+  type        String
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt   DateTime?  @map("deleted_at") @db.Timestamptz()
+
+  @@map("sale_order_addresses")
+}
+
+model SaleOrderCoupon {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  saleOrderId String     @map("sale_order_id")
+  saleOrder   SalesOrder @relation(fields: [saleOrderId], references: [id])
+  code        String     @unique
+  type        String
+  value       Decimal
+  amount      Decimal
+  productSku  String     @map("product_sku")
+  concept     String
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt   DateTime?  @map("deleted_at") @db.Timestamptz()
+
+  @@map("sale_order_coupons")
+}
+
+model SaleOrderItem {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  saleOrderId    String      @map("sale_order_id")
+  saleOrder      SalesOrder  @relation(fields: [saleOrderId], references: [id])
+  productId      String      @map("product_id")
+  productType    ProductType @map("product_type")
+  sku            String
+  name           String
+  description    String?
+  comment        String?
+  qty            Int
+  price          Decimal
+  subtotal       Decimal
+  total          Decimal
+  originalPrice  Decimal     @map("original_price")
+  discountType   String      @map("discount_type")
+  discountValue  Decimal     @map("discount_value")
+  discountAmount Decimal     @map("discount_amount")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz()
+
+  @@map("sale_order_items")
+}
+
+model CasbinRule {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz()
+
+  @@map("casbin_rules")
+}
